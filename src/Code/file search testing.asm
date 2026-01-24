@@ -1,305 +1,54 @@
-// MEMORY FORMAT:
-// 0-36863: user program (36kb)
-// 36864-45055: kernel program (8kb)
-// 45056-49151: kernel heap (4kb)
-// 49152-55295: user heap (6kb)
-// 55296-65535: stack (10kb)
+// store MemMan.KER at the first block in user heap
+const USER_HEAP_START = 49152
 
+const memoryPointer = r13
+const ssdPointer = r1
+const value = r2
 
-const STACK_OFFSET = 0 // what's a stack offset?
+call InitKernelProgram
 
-const pixelColour = r1
-const pixelPosition = r2
-const characterValue = r3
-const accessValue = r12
-const accessAddress = r13
+imm memoryPointer, USER_HEAP_START
+imm value, 0b1000000000001010
+store_16 [memoryPointer], value
 
-const maxPixelPosition = 19200
+add memoryPointer, memoryPointer, 2
+imm value, 77 // M
+store_8 [memoryPointer], value
+add memoryPointer, memoryPointer, 1
+imm value, 101 // e
+store_8 [memoryPointer], value
+add memoryPointer, memoryPointer, 1
+imm value, 109 // m
+store_8 [memoryPointer], value
+add memoryPointer, memoryPointer, 1
+imm value, 77 // M
+store_8 [memoryPointer], value
+add memoryPointer, memoryPointer, 1
+imm value, 97 // a
+store_8 [memoryPointer], value
+add memoryPointer, memoryPointer, 1
+imm value, 110 // n
+store_8 [memoryPointer], value
+add memoryPointer, memoryPointer, 1
+imm value, 46 // .
+store_8 [memoryPointer], value
+add memoryPointer, memoryPointer, 1
+imm value, 75 // K
+store_8 [memoryPointer], value
+add memoryPointer, memoryPointer, 1
+imm value, 69 // E
+store_8 [memoryPointer], value
+add memoryPointer, memoryPointer, 1
+imm value, 82 // R
+store_8 [memoryPointer], value
+imm memoryPointer, USER_HEAP_START
 
-// set stack offset
-imm sp, STACK_OFFSET
-
-//jmp PrintAllCharacters
-
-call Startup
-
+call FindFileFromDirectory
 jmp END_PGRM
 
-// FUNCTIONS:
-Startup:
-	call BootMemoryManager
-	
-	
-	call DisplayStartup
-	
-	imm pixelColour, white
-	imm characterValue, 72
-	imm pixelPosition, 161
-	push pixelPosition
-	call DrawCharacter
-	
-	pop pixelPosition
-	add pixelPosition, pixelPosition, 9
-	push pixelPosition
-	imm characterValue, 101
-	call DrawCharacter
-	
-	pop pixelPosition
-	add pixelPosition, pixelPosition, 9
-	push pixelPosition
-	imm characterValue, 108
-	call DrawCharacter
-	
-	pop pixelPosition
-	add pixelPosition, pixelPosition, 9
-	push pixelPosition
-	imm characterValue, 108
-	call DrawCharacter
-	
-	pop pixelPosition
-	add pixelPosition, pixelPosition, 9
-	push pixelPosition
-	imm characterValue, 111
-	call DrawCharacter
-	
-	pop pixelPosition
-	add pixelPosition, pixelPosition, 9
-	push pixelPosition
-	imm characterValue, 32
-	call DrawCharacter
-	
-	pop pixelPosition
-	add pixelPosition, pixelPosition, 9
-	push pixelPosition
-	imm characterValue, 119
-	call DrawCharacter
-	
-	pop pixelPosition
-	add pixelPosition, pixelPosition, 9
-	push pixelPosition
-	imm characterValue, 111
-	call DrawCharacter
-	
-	pop pixelPosition
-	add pixelPosition, pixelPosition, 9
-	push pixelPosition
-	imm characterValue, 114
-	call DrawCharacter
-	
-	pop pixelPosition
-	add pixelPosition, pixelPosition, 9
-	push pixelPosition
-	imm characterValue, 108
-	call DrawCharacter
-	
-	pop pixelPosition
-	add pixelPosition, pixelPosition, 9
-	push pixelPosition
-	imm characterValue, 100
-	call DrawCharacter
-	
-	pop pixelPosition
-	add pixelPosition, pixelPosition, 9
-	push pixelPosition
-	imm characterValue, 33
-	call DrawCharacter
-	pop pixelPosition
-	
-	return
-	
-BootMemoryManager:
-	return
 
-
-DisplayStartup:
-	imm pixelColour, navy
-	call DrawBackground
-	return
-
-
-DrawBackground:
-	imm pixelPosition, 0
-	
-	DrawBackground_Draw:	
-		draw pixelColour, [pixelPosition]
-		add pixelPosition, pixelPosition, 1
-		cmp pixelPosition, maxPixelPosition
-		jle DrawBackground_Draw
-	
-	imm pixelPosition, 0
-	return
-
-	
-DrawCharacter:
-	const characterOffset = r4
-	const iterations = r3
-	// load SSD access address and calibrate for character value
-	push characterValue
-	mul characterValue, characterValue, 8
-	//imm accessAddress, defaultCharacterAddress
-	sub accessAddress, accessAddress, characterValue
-	imm iterations, 0
-	
-	// load first byte of character to memory
-	DrawCharacter_LoadByte:
-	
-		// if the end has been reached
-		// if iterations == 8
-		cmp iterations, 8
-		jl DrawCharacter_DrawByte
-			pop characterValue
-			return
-		
-		DrawCharacter_DrawByte:
-			pload_8 accessValue, [accessAddress]
-			imm characterOffset, 0
-			
-			// shift left 8
-			lsl accessValue, accessValue, 8
-			
-			DrawCharacter_DrawNextBit:
-			// if negative
-			cmp accessValue, 0
-			jge DrawCharacter_CheckPixelOffset
-				// place pixel here
-				draw pixelColour, [pixelPosition]
-			
-			
-			DrawCharacter_CheckPixelOffset:
-			// if offset >=8:
-			cmp characterOffset, 8
-			jl DrawCharacter_NotLastBit
-				// add 160 to pixel position
-				add pixelPosition, pixelPosition, 152
-				// load next byte
-				sub accessAddress, accessAddress, 1
-				add iterations, iterations, 1
-				jmp DrawCharacter_LoadByte
-				
-				
-			DrawCharacter_NotLastBit:
-			// else:
-				// add 1 to pixel position
-				add pixelPosition, pixelPosition, 1
-				add characterOffset, characterOffset, 1	
-				// shift left by 1
-				lsl accessValue, accessValue, 1
-				jmp DrawCharacter_DrawNextBit
-		
-	
-Shutdown:
-	imm pixelColour, gray
-	call DrawBackground
-	return
-	
-PrintAllCharacters:
-	imm pixelColour, white
-	imm characterValue, 0
-	imm pixelPosition, 164
-	PrintAllCharacters_PrintNext:
-		cmp characterValue, 255
-		jg END_PGRM
-		push pixelPosition
-		
-		mod pixelPosition, pixelPosition, 160
-		cmp pixelPosition, 145
-		jl PrintAllCharacters_PrintNext_PRINT_IT
-			pop pixelPosition
-			add pixelPosition, pixelPosition, 1296
-			push pixelPosition
-			jmp PrintAllCharacters_PrintNext_PRINT_IT1
-			
-		PrintAllCharacters_PrintNext_PRINT_IT:
-		pop pixelPosition
-		push pixelPosition
-		PrintAllCharacters_PrintNext_PRINT_IT1:
-		call DrawCharacter
-		pop pixelPosition
-		add characterValue, characterValue, 1
-		add pixelPosition, pixelPosition, 9
-		jmp PrintAllCharacters_PrintNext
-	
-// FUNCTION: init
-
-InitMemoryManager:
-	
-	// this function will be run on computer startup
-	// it accounts for the fact it will be loaded into memory before it is run
-
-	// MEMORY FORMAT:
-	// 0-36863: user program (36kb)
-	// 36864-45055: kernel program (8kb)
-	// 45056-49151: kernel heap (4kb)
-	// 49152-55295: user heap (6kb)
-	// 55296-65535: stack (10kb)
-
-	// there is no bitmap to initialize
-	// initialize the block header of the kernel heap
-		// header format: free/used (1 bit) size (15 bits)
-		// 0 means free and 1 means taken
-	imm r1, 0b0001000000000000 // 4KiB
-	store_16 [45056], r1
-	// do the same for the user heap
-	imm r1, 0b0001100000000000 // 6KiB
-	store_16 [49152], r1
-	// and the user program
-	imm r1, 0b1000000000000000 // 32KiB
-	store_16 [4096], r1
-	
-	// load memory manager functions into kernel program ram
-	
-	
-	
-	// FUNCTION: find heap block
-	
-		// navigate to the start of the heap
-		imm r2, 36864
-		// read the header of block 1 (2 bytes)
-		load_16 r3, [r2]
-		
-		// if it's free (not negative)
-		cmp r3, 0
-		// mask the first bit to get the size regardless
-		and r3, r3, 0b0111111111111111
-		jge 36
-			// if it's taken, add that number to the address
-			add r2, r2, r3
-			jmp 4
-		
-		// only accept it if it can fit the size requested
-			// size is stored in r1
-		cmp r3, r1
-		// TODO: i think this should search the next block? so add before jumping
-		jl 4	// THIS IS INDEX 36 DURING RUNTIME
-		
-		// claim the header
-		add r1, r1, 0b1000000000000000
-		store_16 [r2], r1
-		// prep the header for the next block
-		sub r1, r1, 0b1000000000000000
-		add r2, r2, r1
-		cmp r1, r3
-		je 68
-		// create the next block's header
-		sub r3, r3, r1
-		store_16 [r2], r3
-
-		return // THIS IS INDEX 72 DURING RUNTIME
-		
-
-// initialize the kernel program
 InitKernelProgram:
-	// the purpose of this code is to load core FS and MM functionality
-	// to kickstart the rest of the system.
-	
-	// by the time this finishes running, the system should know how to:
-		// - find the contents of a file by directory
-		// - read from a file and allocate it to the user program
-		// - run programs in UPG and KPG memory using UH and KH respectively
-	
-	// ============================================================================
-	
-	// INITIALIZE HEADERS
+// INITIALIZE HEADERS
 	// header format: free/used (1 bit) size (15 bits)
 	// 0 means free and 1 means taken
 	imm r1, 0b0001000000000000 // 4KiB
@@ -308,11 +57,12 @@ InitKernelProgram:
 	imm r1, 0b0001100000000000 // 6KiB
 	store_16 [49152], r1
 	// and the user program
-	imm r1, 0b0111111111111111 // 32KiB (32767B) (yes, we're 1 short...)
+	imm r1, 0b0111111111111111 // 32KiB (32767B) (yes, we're 1 byte short...)
 	store_16 [4096], r1
-	
+	return
 
 	// FUNCTION: FindFileFromDirectory
+FindFileFromDirectory:
 
 	// START: this will be loaded to RAM address 36864
 	// where do we assume the args are?
@@ -326,10 +76,10 @@ InitKernelProgram:
 	const FFFD_FromMemory = r1
 	const FFFD_FromDisk = r2
 	const FFFD_InodeNumber = r3
+    const FFFD_InodeGroupNumber = r4
 
 	// using the address stored in r13, find the size of the string we're dealing with from the block header
 	push FFFD_Args
-	sub FFFD_Args, FFFD_Args, 2	// offset pointer to the block header
 	load_16 FFFD_Size, [FFFD_Args]
 	add FFFD_Args, FFFD_Args, 2	// navigate back into the content of the block
 	and FFFD_Size, FFFD_Size, 0b0111111111111111 // mask the first bit, we only care about the size
@@ -341,7 +91,7 @@ InitKernelProgram:
 
 	// if the input string's size is 0, do nothing
 	cmp FFFD_Size, zr
-	je justReturn
+	je END_FFFD
 
 	// LOOP HERE - FOR EVERY DIRECTORY IN THE SEARCH PATH
 	ForEveryDirectory:
@@ -356,11 +106,15 @@ InitKernelProgram:
 			// FFFD_FromDisk now contains this inode's first/next block pointer
 			// assuming this is a directory, search the block's data for our filename. it can only be 15B max so we can use Args.
 			push FFFD_FsAddress	// remember this filesystem address for later. if this block is a dud, we'll need to come back to it
-			mov FFFD_FromDisk, FFFD_FsAddress
+			mov FFFD_FsAddress, FFFD_FromDisk
 
 			ForEveryEntry:
+				push FFFD_Args
+				push FFFD_Size
 				imm FFFD_CheckedBytes, 0
 				pload_8 FFFD_InodeNumber, [FFFD_FsAddress]	// the first byte is the inode number. save it for later
+				add FFFD_FsAddress, FFFD_FsAddress, 1 
+				pload_8 FFFD_InodeGroupNumber, [FFFD_FsAddress]	// the second byte is the inode's group number. save it for later
 				add FFFD_FsAddress, FFFD_FsAddress, 1 
 
 				// LOOP HERE - FOR EVERY CHARACTER IN THIS ENTRY
@@ -369,14 +123,15 @@ InitKernelProgram:
 					// check the size to make sure we're not going over
 					cmp FFFD_Size, zr
 					jle MaxSizeReached
-					cmp FFFD_CheckedBytes, 15
-					jle MaxSizeReached
+					cmp FFFD_CheckedBytes, 14
+					jg MaxSizeReached
 
 					load_8 FFFD_FromMemory, [FFFD_Args]	// read in the filename query
 					sub FFFD_Size, FFFD_Size, 1
 					pload_8 FFFD_FromDisk, [FFFD_FsAddress] // read in the filename in the entry
 					add FFFD_FsAddress, FFFD_FsAddress, 1 // go to the next byte/character
 					add FFFD_Args, FFFD_Args, 1
+					add FFFD_CheckedBytes, FFFD_CheckedBytes, 1
 
 					cmp FFFD_FromDisk, FFFD_FromMemory
 
@@ -390,9 +145,17 @@ InitKernelProgram:
 					// this doesn't mean this is a match though! if we search for M, MemMan.KER shouldn't count.
 					// if it is truly a match, Size must be 0 AND
 					cmp FFFD_CheckedBytes, zr
-					jne NotThisEntry
+					je DidCheckEntireName
+					
+					add FFFD_FsAddress, FFFD_FsAddress, 1
+					push r1
+					pload_8 r1, [FFFD_FsAddress]
+					cmp r1, 0
+					pop r1
+					jne FileNotFound
 
-					// checkedBytes == 0
+					DidCheckEntireName:
+					// check if the query was completed
 					cmp FFFD_Size, zr
 					je FileFound
 
@@ -413,6 +176,9 @@ InitKernelProgram:
 				NotThisEntry:
 					// there was a mismatch, and the file is not in this entry.
 
+					pop FFFD_Size
+					pop FFFD_Args
+
 					// each block has 4 entries.
 					// if we're at the 4th entry, this block is a dud. navigate back to it
 					// using the superblock, find the block size. FFFD_FsAddress % BLOCK_SIZE should be < 48
@@ -424,6 +190,10 @@ InitKernelProgram:
 					// this block is still good. navigate to the next entry
 					push r1
 					mod r1, FFFD_FsAddress, 16	// see how far in we are to the current entry
+					push r2
+					imm r2, 16
+					sub r1, r2, r1
+					pop r2
 					add FFFD_FsAddress, FFFD_FsAddress, r1	// jump to the first byte of the next entry
 					pop r1
 					jmp ForEveryEntry
@@ -509,18 +279,16 @@ InitKernelProgram:
 			// navigate to the found inode using the number earlier.
 			// inodes start at block 3
 			// navigate to the superblock to get the block size
-			pload_8 FFFD_FromDisk, [3]
-			div FFFD_FsAddress, FFFD_FsAddress, FFFD_FromDisk	// divide the address by the block size to get the block number we're at
-			pload_8 FFFD_FromDisk, [9]
-			div FFFD_FsAddress, FFFD_FsAddress, FFFD_FromDisk	// then divide it by the blocks per group to get the group number we're in
+			mov FFFD_FsAddress, FFFD_InodeGroupNumber
 			// the formula for GROUP_START_POINTER is GROUP_NUMBER*BLOCKS_PER_GROUP*BLOCK_SIZE
+			pload_8 FFFD_FromDisk, [9]  // blocks per group
 			mul FFFD_FsAddress, FFFD_FsAddress, FFFD_FromDisk
 			pload_8 FFFD_FromDisk, [3]
 			mul FFFD_FsAddress, FFFD_FsAddress, FFFD_FromDisk
 			// the pointer for an inode with a number is (GROUP_START_POINTER + BLOCK_SIZE*3 + INODE_SIZE*INODE_NUMBER)
 			mul FFFD_FromDisk, FFFD_FromDisk, 3
 			add FFFD_FsAddress, FFFD_FsAddress, FFFD_FromDisk
-			pload_8 FFFD_FromDisk [4]
+			pload_8 FFFD_FromDisk, [4]
 			mul FFFD_FromDisk, FFFD_FromDisk, FFFD_InodeNumber
 			add FFFD_FsAddress, FFFD_FsAddress, FFFD_FromDisk
 			// we should now be at the right inode!
@@ -533,11 +301,34 @@ InitKernelProgram:
 
 
 	FileNotFound:
-		imm FFFD_InodeNumber, 0
+		imm FFFD_InodeNumber, 0b1111111111111111
+        imm FFFD_InodeGroupNumber, 0
 		jmp END_FFFD
 	
 	FileFound:
-		return
+		pop FFFD_Size
+		pop FFFD_Args
+        // navigate to the found inode using the number earlier.
+        // inodes start at block 3
+        // navigate to the superblock to get the block size
+        mov FFFD_FsAddress, FFFD_InodeGroupNumber
+        pload_8 FFFD_FromDisk, [9]  // blocks per group
+        // the formula for GROUP_START_POINTER is GROUP_NUMBER*BLOCKS_PER_GROUP*BLOCK_SIZE
+        mul FFFD_FsAddress, FFFD_FsAddress, FFFD_FromDisk
+        pload_8 FFFD_FromDisk, [3]
+        mul FFFD_FsAddress, FFFD_FsAddress, FFFD_FromDisk
+        // the pointer for an inode with a number is (GROUP_START_POINTER + BLOCK_SIZE*3 + INODE_SIZE*INODE_NUMBER)
+        mul FFFD_FromDisk, FFFD_FromDisk, 3
+        add FFFD_FsAddress, FFFD_FsAddress, FFFD_FromDisk
+        pload_8 FFFD_FromDisk, [4]
+        mul FFFD_FromDisk, FFFD_FromDisk, FFFD_InodeNumber
+        add FFFD_FsAddress, FFFD_FsAddress, FFFD_FromDisk
+        // we should now be at the right inode!
+        add FFFD_FsAddress, FFFD_FsAddress, 7
+            
+		// for now, just return the pointer to the first data block in r1
+        pload_16 r1, [FFFD_FsAddress]
+
 		jmp END_FFFD
 
 	END_FFFD:

@@ -280,6 +280,7 @@ store_16 [%address(immediate)], %value(register)
 01110011 0000vvvv aaaaaaaa aaaaaaaa
 Store %value to %address in RAM
 
+
 pload_8 %dest(register), [%address(register)]
 01100100 dddd0000 0000aaaa 00000000
 Loads %address from SSD and stores it to %dest

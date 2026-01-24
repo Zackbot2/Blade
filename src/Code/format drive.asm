@@ -129,8 +129,7 @@ CreateSuperblock:
 	imm r7, BLOCK_SIZE
 	mul r7, r7, 11
 	// 9: blocks per group
-	imm r8, BLOCK_COUNT
-	div r8, r8, GROUP_SIZE
+	imm r8, GROUP_SIZE
 	// 10: flags/reserved
 	
 	// write the data, officially creating the superblock
@@ -331,11 +330,11 @@ CreateRootDirectory:
 	
 	// each INODE contains:
 	// 0: file type (1B)
-	imm exactAddress, 192	// address 192 is the beginning of block 4 in group 0 (3*64)
+	imm exactAddress, 192	// address 192 is the beginning of block 3 in group 0 (3*64)
 	pstore_8 [exactAddress], fileType
 	// 1-2: size in bytes (2B)
 	imm fileSize, BLOCK_SIZE	// this is a directory, so it's given 1 block for now
-	add exactAddress, exactAddress, 2
+	add exactAddress, exactAddress, 1
 	pstore_16 [exactAddress], fileSize
 	// 3-4: timestamp (2B)
 	add exactAddress, exactAddress, 2
@@ -353,7 +352,7 @@ CreateRootDirectory:
 		// pointer #4 (from 1) is an indirect pointer
 		// this allows an inode to reference up to 35 blocks
 	// -- pointers to self --
-	imm exactAddress, 192	// (3*64), first inode in the table
+	add exactAddress, exactAddress, 2
 	push blockNumber
 	imm blockNumber, 704	// byte 704 is the exact address of the first data block of the first block group
 	pstore_16 [exactAddress], blockNumber
@@ -364,7 +363,7 @@ CreateRootDirectory:
 	pstore_16 [exactAddress], blockNumber
 	
 	pop blockNumber
-	// create the inode pointer in the data block
+	// create the inode pointers in the data block
 	imm exactAddress, 704
 	
 	
@@ -373,7 +372,8 @@ CreateRootDirectory:
 	imm inodeNumber, 0
 	pstore_8 [exactAddress], inodeNumber
 	
-	add exactAddress, exactAddress, 1
+	// add 2 here as the second byte is for the group number, but we're in group 0.
+	add exactAddress, exactAddress, 2
 	imm r1, 46 // .
 	pstore_8 [exactAddress], r1
 	
@@ -381,7 +381,7 @@ CreateRootDirectory:
 	// do not add to the inodeNumber, as this is root and it references itself twice.
 	imm exactAddress, 720 // the next entry in the data block
 	pstore_8 [exactAddress], inodeNumber
-	add exactAddress, exactAddress, 1
+	add exactAddress, exactAddress, 2
 	imm r1, 46 // .
 	pstore_8 [exactAddress], r1
 	add exactAddress, exactAddress, 1
@@ -394,7 +394,7 @@ CreateRootDirectory:
 	// index the memory manager
 		// it has yet to exist, but is hardcoded so we can add it now
 	pstore_8 [exactAddress], inodeNumber
-	add exactAddress, exactAddress, 1
+	add exactAddress, exactAddress, 2
 	
 	imm r1, 77 // M
 	pstore_8 [exactAddress], r1
@@ -463,13 +463,13 @@ CreateMemoryManager:
 	
 	// each INODE contains:
 	// 0: file type (1B)
-	imm exactAddress, 192
+	imm exactAddress, 208 // (3*64+16)
 	add exactAddress, exactAddress, 14
 	imm fileType, fileType_KER
 	pstore_8 [exactAddress], fileType
 	// 1-2: size in bytes (2B)
 	imm fileSize, 33
-	add exactAddress, exactAddress, 2
+	add exactAddress, exactAddress, 1
 	imm fileSize, 0
 	pstore_16 [exactAddress], fileSize
 	// 3-4: timestamp (2B)
@@ -488,7 +488,7 @@ CreateMemoryManager:
 		// this allows an inode to reference up to 35 blocks
 	add exactAddress, exactAddress, 2
 	push blockNumber
-	imm blockNumber, 832	// the 2nd data block of the first group (13*64)
+	imm blockNumber, 768	// the 2nd data block of the first group (12*64)
 	pstore_16 [exactAddress], blockNumber
 	add exactAddress, exactAddress, 2
 	add blockNumber, blockNumber, BLOCK_SIZE
@@ -498,7 +498,7 @@ CreateMemoryManager:
 	// it has already been hardcoded as a child of root
 	
 	//STEP 2: navigate to the data block and start creating program data!
-	imm exactAddress, 832	// the 2nd data block of the first group (13*64)
+	imm exactAddress, 768	// the 2nd data block of the first group (12*64)
 	
 	// low key, i don't actually know what to put here yet.
 	
