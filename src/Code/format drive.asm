@@ -357,11 +357,6 @@ CreateRootDirectory:
 	imm blockNumber, 704	// byte 704 is the exact address of the first data block of the first block group
 	pstore_16 [exactAddress], blockNumber
 	
-	// -- memory manager pointer
-	imm exactAddress, 208 // (3*64+16), the next inode in the table
-	imm blockNumber, 768	// byte 768 is is the first byte of the next block
-	pstore_16 [exactAddress], blockNumber
-	
 	pop blockNumber
 	// create the inode pointers in the data block
 	imm exactAddress, 704
@@ -370,17 +365,16 @@ CreateRootDirectory:
 	// ==== DIRECTORY DATA ====
 	
 	imm inodeNumber, 0
-	pstore_8 [exactAddress], inodeNumber
-	
-	// add 2 here as the second byte is for the group number, but we're in group 0.
+	pstore_16 [exactAddress], inodeNumber
 	add exactAddress, exactAddress, 2
+
 	imm r1, 46 // .
 	pstore_8 [exactAddress], r1
 	
 	//add inodeNumber, inodeNumber, 1
 	// do not add to the inodeNumber, as this is root and it references itself twice.
 	imm exactAddress, 720 // the next entry in the data block
-	pstore_8 [exactAddress], inodeNumber
+	pstore_16 [exactAddress], inodeNumber
 	add exactAddress, exactAddress, 2
 	imm r1, 46 // .
 	pstore_8 [exactAddress], r1
@@ -393,7 +387,7 @@ CreateRootDirectory:
 	add inodeNumber, inodeNumber, 1
 	// index the memory manager
 		// it has yet to exist, but is hardcoded so we can add it now
-	pstore_8 [exactAddress], inodeNumber
+	pstore_16 [exactAddress], inodeNumber
 	add exactAddress, exactAddress, 2
 	
 	imm r1, 77 // M
@@ -464,7 +458,6 @@ CreateMemoryManager:
 	// each INODE contains:
 	// 0: file type (1B)
 	imm exactAddress, 208 // (3*64+16)
-	add exactAddress, exactAddress, 14
 	imm fileType, fileType_KER
 	pstore_8 [exactAddress], fileType
 	// 1-2: size in bytes (2B)

@@ -112,10 +112,8 @@ FindFileFromDirectory:
 				push FFFD_Args
 				push FFFD_Size
 				imm FFFD_CheckedBytes, 0
-				pload_8 FFFD_InodeNumber, [FFFD_FsAddress]	// the first byte is the inode number. save it for later
-				add FFFD_FsAddress, FFFD_FsAddress, 1 
-				pload_8 FFFD_InodeGroupNumber, [FFFD_FsAddress]	// the second byte is the inode's group number. save it for later
-				add FFFD_FsAddress, FFFD_FsAddress, 1 
+				pload_16 FFFD_InodeNumber, [FFFD_FsAddress]	// the first byte is the inode number. save it for later
+				add FFFD_FsAddress, FFFD_FsAddress, 2
 
 				// LOOP HERE - FOR EVERY CHARACTER IN THIS ENTRY
 				ForEveryCharacter:
@@ -276,26 +274,50 @@ FindFileFromDirectory:
 			cmp FFFD_FromDisk, 92
 			je FileNotFound
 
+
+			const blockSize = r1
+			const groupSize = r2
+			const blocksPerGroup = r5
+			const groupNumber = r4
+			const inodesPerGroup = r7
+			const inodeSize = r8
+
+			push r1
+			push r2
+			push r4
+			push r5
+			push r7
+			push r8
+
 			// navigate to the found inode using the number earlier.
 			// inodes start at block 3
 			// navigate to the superblock to get the block size
-			mov FFFD_FsAddress, FFFD_InodeGroupNumber
-			// the formula for GROUP_START_POINTER is GROUP_NUMBER*BLOCKS_PER_GROUP*BLOCK_SIZE
-			pload_8 FFFD_FromDisk, [9]  // blocks per group
-			mul FFFD_FsAddress, FFFD_FsAddress, FFFD_FromDisk
-			pload_8 FFFD_FromDisk, [3]
-			mul FFFD_FsAddress, FFFD_FsAddress, FFFD_FromDisk
-			// the pointer for an inode with a number is (GROUP_START_POINTER + BLOCK_SIZE*3 + INODE_SIZE*INODE_NUMBER)
-			mul FFFD_FromDisk, FFFD_FromDisk, 3
-			add FFFD_FsAddress, FFFD_FsAddress, FFFD_FromDisk
-			pload_8 FFFD_FromDisk, [4]
-			mul FFFD_FromDisk, FFFD_FromDisk, FFFD_InodeNumber
-			add FFFD_FsAddress, FFFD_FsAddress, FFFD_FromDisk
-			// we should now be at the right inode!
+			pload_8 blockSize, [3]
+			pload_8 inodeSize, [4]
+			pload_8 inodesPerGroup, [5]
+			pload_8 blocksPerGroup, [9]
+			mul groupSize, blockSize, blocksPerGroup
+
+			// FFFD_FsAddress = floor(FFFD_InodeNumber/inodesPerGroup)*groupSize + 3*blockSize + inodeSize * FFFD_InodeNumber
+			div FFFD_FsAddress, FFFD_InodeNumber, inodesPerGroup
+			mul FFFD_FsAddress, FFFD_FsAddress, groupSize
+
+			mul blockSize, blockSize, 3
+			add FFFD_FsAddress, FFFD_FsAddress, blockSize
+
+			mul inodeSize, inodeSize, FFFD_InodeNumber
+			add FFFD_FsAddress, FFFD_FsAddress, inodeSize
+			// we should now have the pointer to the right inode!
 
 			// is this a directory? the first byte is the file type
 			pload_8 FFFD_FromDisk, [FFFD_FsAddress]
 			cmp FFFD_FromDisk, 0b10000000	// 0b10000000 is the 'Folder' file type
+			pop r1
+			pop r2
+			pop r4
+			pop r5
+			pop r7
+			pop r8
 			je ForEveryDirectory
 			jne FileNotFound
 
@@ -311,24 +333,34 @@ FindFileFromDirectory:
         // navigate to the found inode using the number earlier.
         // inodes start at block 3
         // navigate to the superblock to get the block size
-        mov FFFD_FsAddress, FFFD_InodeGroupNumber
-        pload_8 FFFD_FromDisk, [9]  // blocks per group
-        // the formula for GROUP_START_POINTER is GROUP_NUMBER*BLOCKS_PER_GROUP*BLOCK_SIZE
-        mul FFFD_FsAddress, FFFD_FsAddress, FFFD_FromDisk
-        pload_8 FFFD_FromDisk, [3]
-        mul FFFD_FsAddress, FFFD_FsAddress, FFFD_FromDisk
-        // the pointer for an inode with a number is (GROUP_START_POINTER + BLOCK_SIZE*3 + INODE_SIZE*INODE_NUMBER)
-        mul FFFD_FromDisk, FFFD_FromDisk, 3
-        add FFFD_FsAddress, FFFD_FsAddress, FFFD_FromDisk
-        pload_8 FFFD_FromDisk, [4]
-        mul FFFD_FromDisk, FFFD_FromDisk, FFFD_InodeNumber
-        add FFFD_FsAddress, FFFD_FsAddress, FFFD_FromDisk
-        // we should now be at the right inode!
-        add FFFD_FsAddress, FFFD_FsAddress, 7
-            
-		// for now, just return the pointer to the first data block in r1
-        pload_16 r1, [FFFD_FsAddress]
+        
+		const blockSize = r1
+        const groupSize = r2
+		const blocksPerGroup = r5
+		const groupNumber = r4
+		const inodesPerGroup = r7
+		const inodeSize = r8
 
+
+		pload_8 blockSize, [3]
+		pload_8 inodeSize, [4]
+		pload_8 inodesPerGroup, [5]
+		pload_8 blocksPerGroup, [9]
+		mul groupSize, blockSize, blocksPerGroup
+
+		// FFFD_FsAddress = floor(FFFD_InodeNumber/inodesPerGroup)*groupSize + 3*blockSize + inodeSize * FFFD_InodeNumber
+		div FFFD_FsAddress, FFFD_InodeNumber, inodesPerGroup
+		mul FFFD_FsAddress, FFFD_FsAddress, groupSize
+
+		mul blockSize, blockSize, 3
+		add FFFD_FsAddress, FFFD_FsAddress, blockSize
+
+		mul inodeSize, inodeSize, FFFD_InodeNumber
+		add FFFD_FsAddress, FFFD_FsAddress, inodeSize
+        // we should now have the pointer to the right inode!
+
+		// for now, just return the pointer to the inode in r1
+        mov r1, FFFD_FsAddress
 		jmp END_FFFD
 
 	END_FFFD:

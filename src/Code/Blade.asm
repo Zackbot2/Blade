@@ -312,7 +312,8 @@ InitKernelProgram:
 	store_16 [4096], r1
 	
 
-	// FUNCTION: FindFileFromDirectory
+		// FUNCTION: FindFileFromDirectory
+FindFileFromDirectory:
 
 	// START: this will be loaded to RAM address 36864
 	// where do we assume the args are?
@@ -326,10 +327,10 @@ InitKernelProgram:
 	const FFFD_FromMemory = r1
 	const FFFD_FromDisk = r2
 	const FFFD_InodeNumber = r3
+    const FFFD_InodeGroupNumber = r4
 
 	// using the address stored in r13, find the size of the string we're dealing with from the block header
 	push FFFD_Args
-	sub FFFD_Args, FFFD_Args, 2	// offset pointer to the block header
 	load_16 FFFD_Size, [FFFD_Args]
 	add FFFD_Args, FFFD_Args, 2	// navigate back into the content of the block
 	and FFFD_Size, FFFD_Size, 0b0111111111111111 // mask the first bit, we only care about the size
@@ -341,7 +342,7 @@ InitKernelProgram:
 
 	// if the input string's size is 0, do nothing
 	cmp FFFD_Size, zr
-	je justReturn
+	je END_FFFD
 
 	// LOOP HERE - FOR EVERY DIRECTORY IN THE SEARCH PATH
 	ForEveryDirectory:
@@ -356,12 +357,14 @@ InitKernelProgram:
 			// FFFD_FromDisk now contains this inode's first/next block pointer
 			// assuming this is a directory, search the block's data for our filename. it can only be 15B max so we can use Args.
 			push FFFD_FsAddress	// remember this filesystem address for later. if this block is a dud, we'll need to come back to it
-			mov FFFD_FromDisk, FFFD_FsAddress
+			mov FFFD_FsAddress, FFFD_FromDisk
 
 			ForEveryEntry:
+				push FFFD_Args
+				push FFFD_Size
 				imm FFFD_CheckedBytes, 0
-				pload_8 FFFD_InodeNumber, [FFFD_FsAddress]	// the first byte is the inode number. save it for later
-				add FFFD_FsAddress, FFFD_FsAddress, 1 
+				pload_16 FFFD_InodeNumber, [FFFD_FsAddress]	// the first byte is the inode number. save it for later
+				add FFFD_FsAddress, FFFD_FsAddress, 2
 
 				// LOOP HERE - FOR EVERY CHARACTER IN THIS ENTRY
 				ForEveryCharacter:
@@ -369,14 +372,15 @@ InitKernelProgram:
 					// check the size to make sure we're not going over
 					cmp FFFD_Size, zr
 					jle MaxSizeReached
-					cmp FFFD_CheckedBytes, 15
-					jle MaxSizeReached
+					cmp FFFD_CheckedBytes, 14
+					jg MaxSizeReached
 
 					load_8 FFFD_FromMemory, [FFFD_Args]	// read in the filename query
 					sub FFFD_Size, FFFD_Size, 1
 					pload_8 FFFD_FromDisk, [FFFD_FsAddress] // read in the filename in the entry
 					add FFFD_FsAddress, FFFD_FsAddress, 1 // go to the next byte/character
 					add FFFD_Args, FFFD_Args, 1
+					add FFFD_CheckedBytes, FFFD_CheckedBytes, 1
 
 					cmp FFFD_FromDisk, FFFD_FromMemory
 
@@ -390,9 +394,17 @@ InitKernelProgram:
 					// this doesn't mean this is a match though! if we search for M, MemMan.KER shouldn't count.
 					// if it is truly a match, Size must be 0 AND
 					cmp FFFD_CheckedBytes, zr
-					jne NotThisEntry
+					je DidCheckEntireName
+					
+					add FFFD_FsAddress, FFFD_FsAddress, 1
+					push r1
+					pload_8 r1, [FFFD_FsAddress]
+					cmp r1, 0
+					pop r1
+					jne FileNotFound
 
-					// checkedBytes == 0
+					DidCheckEntireName:
+					// check if the query was completed
 					cmp FFFD_Size, zr
 					je FileFound
 
@@ -413,6 +425,9 @@ InitKernelProgram:
 				NotThisEntry:
 					// there was a mismatch, and the file is not in this entry.
 
+					pop FFFD_Size
+					pop FFFD_Args
+
 					// each block has 4 entries.
 					// if we're at the 4th entry, this block is a dud. navigate back to it
 					// using the superblock, find the block size. FFFD_FsAddress % BLOCK_SIZE should be < 48
@@ -424,6 +439,10 @@ InitKernelProgram:
 					// this block is still good. navigate to the next entry
 					push r1
 					mod r1, FFFD_FsAddress, 16	// see how far in we are to the current entry
+					push r2
+					imm r2, 16
+					sub r1, r2, r1
+					pop r2
 					add FFFD_FsAddress, FFFD_FsAddress, r1	// jump to the first byte of the next entry
 					pop r1
 					jmp ForEveryEntry
@@ -506,38 +525,93 @@ InitKernelProgram:
 			cmp FFFD_FromDisk, 92
 			je FileNotFound
 
+
+			const blockSize = r1
+			const groupSize = r2
+			const blocksPerGroup = r5
+			const groupNumber = r4
+			const inodesPerGroup = r7
+			const inodeSize = r8
+
+			push r1
+			push r2
+			push r4
+			push r5
+			push r7
+			push r8
+
 			// navigate to the found inode using the number earlier.
 			// inodes start at block 3
 			// navigate to the superblock to get the block size
-			pload_8 FFFD_FromDisk, [3]
-			div FFFD_FsAddress, FFFD_FsAddress, FFFD_FromDisk	// divide the address by the block size to get the block number we're at
-			pload_8 FFFD_FromDisk, [9]
-			div FFFD_FsAddress, FFFD_FsAddress, FFFD_FromDisk	// then divide it by the blocks per group to get the group number we're in
-			// the formula for GROUP_START_POINTER is GROUP_NUMBER*BLOCKS_PER_GROUP*BLOCK_SIZE
-			mul FFFD_FsAddress, FFFD_FsAddress, FFFD_FromDisk
-			pload_8 FFFD_FromDisk, [3]
-			mul FFFD_FsAddress, FFFD_FsAddress, FFFD_FromDisk
-			// the pointer for an inode with a number is (GROUP_START_POINTER + BLOCK_SIZE*3 + INODE_SIZE*INODE_NUMBER)
-			mul FFFD_FromDisk, FFFD_FromDisk, 3
-			add FFFD_FsAddress, FFFD_FsAddress, FFFD_FromDisk
-			pload_8 FFFD_FromDisk [4]
-			mul FFFD_FromDisk, FFFD_FromDisk, FFFD_InodeNumber
-			add FFFD_FsAddress, FFFD_FsAddress, FFFD_FromDisk
-			// we should now be at the right inode!
+			pload_8 blockSize, [3]
+			pload_8 inodeSize, [4]
+			pload_8 inodesPerGroup, [5]
+			pload_8 blocksPerGroup, [9]
+			mul groupSize, blockSize, blocksPerGroup
+
+			// FFFD_FsAddress = floor(FFFD_InodeNumber/inodesPerGroup)*groupSize + 3*blockSize + inodeSize * FFFD_InodeNumber
+			div FFFD_FsAddress, FFFD_InodeNumber, inodesPerGroup
+			mul FFFD_FsAddress, FFFD_FsAddress, groupSize
+
+			mul blockSize, blockSize, 3
+			add FFFD_FsAddress, FFFD_FsAddress, blockSize
+
+			mul inodeSize, inodeSize, FFFD_InodeNumber
+			add FFFD_FsAddress, FFFD_FsAddress, inodeSize
+			// we should now have the pointer to the right inode!
 
 			// is this a directory? the first byte is the file type
 			pload_8 FFFD_FromDisk, [FFFD_FsAddress]
 			cmp FFFD_FromDisk, 0b10000000	// 0b10000000 is the 'Folder' file type
+			pop r1
+			pop r2
+			pop r4
+			pop r5
+			pop r7
+			pop r8
 			je ForEveryDirectory
 			jne FileNotFound
 
 
 	FileNotFound:
-		imm FFFD_InodeNumber, 0
+		imm FFFD_InodeNumber, 0b1111111111111111
+        imm FFFD_InodeGroupNumber, 0
 		jmp END_FFFD
 	
 	FileFound:
-		return
+		pop FFFD_Size
+		pop FFFD_Args
+        // navigate to the found inode using the number earlier.
+        // inodes start at block 3
+        // navigate to the superblock to get the block size
+        
+		const blockSize = r1
+        const groupSize = r2
+		const blocksPerGroup = r5
+		const groupNumber = r4
+		const inodesPerGroup = r7
+		const inodeSize = r8
+
+
+		pload_8 blockSize, [3]
+		pload_8 inodeSize, [4]
+		pload_8 inodesPerGroup, [5]
+		pload_8 blocksPerGroup, [9]
+		mul groupSize, blockSize, blocksPerGroup
+
+		// FFFD_FsAddress = floor(FFFD_InodeNumber/inodesPerGroup)*groupSize + 3*blockSize + inodeSize * FFFD_InodeNumber
+		div FFFD_FsAddress, FFFD_InodeNumber, inodesPerGroup
+		mul FFFD_FsAddress, FFFD_FsAddress, groupSize
+
+		mul blockSize, blockSize, 3
+		add FFFD_FsAddress, FFFD_FsAddress, blockSize
+
+		mul inodeSize, inodeSize, FFFD_InodeNumber
+		add FFFD_FsAddress, FFFD_FsAddress, inodeSize
+        // we should now have the pointer to the right inode!
+
+		// for now, just return the pointer to the inode in r1
+        mov r1, FFFD_FsAddress
 		jmp END_FFFD
 
 	END_FFFD:
