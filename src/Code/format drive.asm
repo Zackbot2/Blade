@@ -333,7 +333,7 @@ CreateRootDirectory:
 	imm exactAddress, 192	// address 192 is the beginning of block 3 in group 0 (3*64)
 	pstore_8 [exactAddress], fileType
 	// 1-2: size in bytes (2B)
-	imm fileSize, BLOCK_SIZE	// this is a directory, so it's given 1 block for now
+	imm fileSize, 48	// this is a directory, so the file size is linkCount * INODE_SIZE (we know this is 16, no need to check the superblock)
 	add exactAddress, exactAddress, 1
 	pstore_16 [exactAddress], fileSize
 	// 3-4: timestamp (2B)
@@ -461,9 +461,8 @@ CreateMemoryManager:
 	imm fileType, fileType_KER
 	pstore_8 [exactAddress], fileType
 	// 1-2: size in bytes (2B)
-	imm fileSize, 33
 	add exactAddress, exactAddress, 1
-	imm fileSize, 0
+	imm fileSize, 13
 	pstore_16 [exactAddress], fileSize
 	// 3-4: timestamp (2B)
 	add exactAddress, exactAddress, 2
@@ -494,5 +493,44 @@ CreateMemoryManager:
 	imm exactAddress, 768	// the 2nd data block of the first group (12*64)
 	
 	// low key, i don't actually know what to put here yet.
+	imm r1, 69
+	pstore_8 [exactAddress], r1
+	add exactAddress, exactAddress, 1
+	imm r1, 00
+	pstore_8 [exactAddress], r1
+	add exactAddress, exactAddress, 1
+	imm r1, 67
+	pstore_8 [exactAddress], r1
+	add exactAddress, exactAddress, 1
+	imm r1, 00
+	pstore_8 [exactAddress], r1
+	add exactAddress, exactAddress, 1
+	imm r1, 420
+	pstore_8 [exactAddress], r1
+	add exactAddress, exactAddress, 1
+	imm r1, 69
+	pstore_8 [exactAddress], r1
+	add exactAddress, exactAddress, 1
+	imm r1, 0
+	pstore_8 [exactAddress], r1
+	add exactAddress, exactAddress, 1
+	imm r1, 78
+	pstore_8 [exactAddress], r1
+	add exactAddress, exactAddress, 1
+	imm r1, 32
+	pstore_8 [exactAddress], r1
+	add exactAddress, exactAddress, 1
+	imm r1, 87
+	pstore_8 [exactAddress], r1
+	add exactAddress, exactAddress, 1
+	imm r1, 79
+	pstore_8 [exactAddress], r1
+	add exactAddress, exactAddress, 1
+	imm r1, 82
+	pstore_8 [exactAddress], r1
+	add exactAddress, exactAddress, 1
+	imm r1, 68
+	pstore_8 [exactAddress], r1
+	add exactAddress, exactAddress, 1
 	
 	return
