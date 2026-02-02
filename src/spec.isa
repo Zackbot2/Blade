@@ -1,5 +1,5 @@
 [settings]
-name = "Symphony"
+name = "Blade"
 
 [fields]
 
@@ -196,7 +196,7 @@ DIV %b and %c and store the remainder in %a.
 
 
 jmp %a(register)
-01001000 00001111 0000aaaa 00000000
+01001000 0000aaaa 00000000 00000000
 Jump to %a
 
 jmp %a(immediate | label)
@@ -280,7 +280,6 @@ store_16 [%address(immediate)], %value(register)
 01110011 0000vvvv aaaaaaaa aaaaaaaa
 Store %value to %address in RAM
 
-
 pload_8 %dest(register), [%address(register)]
 01100100 dddd0000 0000aaaa 00000000
 Loads %address from SSD and stores it to %dest
@@ -349,7 +348,7 @@ pop %a(register)
 01100010 aaaa0000 00001110 00000000   00110100 11101110 00000000 00000010
 Pops %a off the stack. This instruction is a synonym for:   load_16 %a, [sp]   add sp, sp, 2
 
-call %a(label)
+call %a(label | immediate)
 00001000 11110000 00000000 00000000   00110100 11111111 00000000 00010100   00110101 11101110 00000000 00000010   01100011 00001111 00001110 00000000   01011000 00001111 aaaaaaaa aaaaaaaa
 Calls %a. Overwrites the flag register. This instruction is a synonym for:   counter flags   add flags, flags, 20   sub sp, sp, 2   store_16 [sp], flags   jmp %a
 
@@ -378,3 +377,9 @@ draw %value(register), [%address(immediate | colour)]
 
 draw %value(register), [%address(register)]
 01101000 0000vvvv 0000aaaa 00000000
+
+
+
+IRET
+10000000 00000000 00000000 00000000
+return execution responsibility to the interrupt handler
