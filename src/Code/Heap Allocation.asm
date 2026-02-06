@@ -5,8 +5,23 @@ const memoryPointer = r13
 const ssdPointer = r1
 const value = r2
 
+imm r1, OnClockInterrupt
+store_16 [3968], r1
+
+imm r1, OnIretAVF
+store_16 [4088], r1
+
 call InitKernelProgram
 
+push flags
+imm flags, Start
+push flags
+iret
+
+
+
+Start:
+iret
 imm memoryPointer, USER_HEAP_START
 imm value, 0b1000000000001010
 store_16 [memoryPointer], value
@@ -34,13 +49,13 @@ store_16 [memoryPointer], value
     imm value, 46 // .
     store_8 [memoryPointer], value
     add memoryPointer, memoryPointer, 1
-    imm value, 75 // K
+    imm value, 107 // K
     store_8 [memoryPointer], value
     add memoryPointer, memoryPointer, 1
-    imm value, 69 // E
+    imm value, 101 // E
     store_8 [memoryPointer], value
     add memoryPointer, memoryPointer, 1
-    imm value, 82 // R
+    imm value, 114 // R
     store_8 [memoryPointer], value
     imm memoryPointer, USER_HEAP_START
 
@@ -567,7 +582,7 @@ FindFileFromDirectory:
 		imm FFFD_InodeNumber, 0b1111111111111111
         imm FFFD_InodeGroupNumber, 0
 		jmp END_FFFD
-	
+		
 	FileFound:
         pop FFFD_FsAddress
 		pop FFFD_Args
@@ -608,6 +623,19 @@ FindFileFromDirectory:
 	END_FFFD:
 		return
 	
-	
 END_PGRM:
 jmp END_PGRM
+
+
+OnClockInterrupt:
+	push r1
+	imm r1, 0b11111111
+	dstore r1, [0]
+	pop r1
+	iret
+	
+OnIretAVF:
+	pop flags
+	add flags, flags, 4
+	push flags
+	iret

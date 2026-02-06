@@ -41,6 +41,8 @@ const GROUP_SIZE = 64 // in blocks
 	// pointer #4 is an indirect pointer
 	// this allows an inode to reference up to 35 blocks
 	
+imm r1, OnClockInterrupt
+store_16 [3968], r1
 
 call FormatDrive
 
@@ -104,6 +106,7 @@ FormatDrive:
 	
 	call CreateRootDirectory
 	call CreateMemoryManager
+	call CreateExecutor
 	
 	return
 
@@ -293,16 +296,16 @@ const fileSize = r2
 const timestamp = r3
 const linkCount = r4
 const inodeNumber = r5
-const exactAddress = r11
+const r11_exactAddress = r11
 const blockNumber = r12
 const inodeNumber = r13
 
 // FILE TYPES:
 const fileType_null = 0
 // 00000001: kernel program
-const fileType_KER = 1
+const fileType_ker = 1
 // 00000010: program
-const fileType_pgrm = 2
+const fileType_pgm = 2
 // 10000000: spritesheet
 const fileType_folder = 0b10000000
 
@@ -330,96 +333,96 @@ CreateRootDirectory:
 	
 	// each INODE contains:
 	// 0: file type (1B)
-	imm exactAddress, 192	// address 192 is the beginning of block 3 in group 0 (3*64)
-	pstore_8 [exactAddress], fileType
+	imm r11_exactAddress, 192	// address 192 is the beginning of block 3 in group 0 (3*64)
+	pstore_8 [r11_exactAddress], fileType
 	// 1-2: size in bytes (2B)
 	imm fileSize, 48	// this is a directory, so the file size is linkCount * INODE_SIZE (we know this is 16, no need to check the superblock)
-	add exactAddress, exactAddress, 1
-	pstore_16 [exactAddress], fileSize
+	add r11_exactAddress, r11_exactAddress, 1
+	pstore_16 [r11_exactAddress], fileSize
 	// 3-4: timestamp (2B)
-	add exactAddress, exactAddress, 2
+	add r11_exactAddress, r11_exactAddress, 2
 	time_0 timestamp
-	pstore_16 [exactAddress], timestamp
+	pstore_16 [r11_exactAddress], timestamp
 	// 5-6: link count (2B)
 		// this directly counts how many data entries link to it
 		// upon creation, this will be 2. the link from itself, and the link from its parent
 		// even though this is the root and it has no parent, it still needs to know that. its parent will be itself.
-	add exactAddress, exactAddress, 2
+	add r11_exactAddress, r11_exactAddress, 2
 	imm linkCount, 3 // this includes Memory Manager
-	pstore_16 [exactAddress], linkCount
+	pstore_16 [r11_exactAddress], linkCount
 	// 7-14: block pointers (8B)
 		// each pointer is 2B. it stores the exact address
 		// pointer #4 (from 1) is an indirect pointer
 		// this allows an inode to reference up to 35 blocks
 	// -- pointers to self --
-	add exactAddress, exactAddress, 2
+	add r11_exactAddress, r11_exactAddress, 2
 	push blockNumber
 	imm blockNumber, 704	// byte 704 is the exact address of the first data block of the first block group
-	pstore_16 [exactAddress], blockNumber
+	pstore_16 [r11_exactAddress], blockNumber
 	
 	pop blockNumber
 	// create the inode pointers in the data block
-	imm exactAddress, 704
+	imm r11_exactAddress, 704
 	
 	
 	// ==== DIRECTORY DATA ====
 	
 	imm inodeNumber, 0
-	pstore_16 [exactAddress], inodeNumber
-	add exactAddress, exactAddress, 2
+	pstore_16 [r11_exactAddress], inodeNumber
+	add r11_exactAddress, r11_exactAddress, 2
 
 	imm r1, 46 // .
-	pstore_8 [exactAddress], r1
+	pstore_8 [r11_exactAddress], r1
 	
 	//add inodeNumber, inodeNumber, 1
 	// do not add to the inodeNumber, as this is root and it references itself twice.
-	imm exactAddress, 720 // the next entry in the data block
-	pstore_16 [exactAddress], inodeNumber
-	add exactAddress, exactAddress, 2
+	imm r11_exactAddress, 720 // the next entry in the data block
+	pstore_16 [r11_exactAddress], inodeNumber
+	add r11_exactAddress, r11_exactAddress, 2
 	imm r1, 46 // .
-	pstore_8 [exactAddress], r1
-	add exactAddress, exactAddress, 1
+	pstore_8 [r11_exactAddress], r1
+	add r11_exactAddress, r11_exactAddress, 1
 	imm r1, 46 // .
-	pstore_8 [exactAddress], r1
+	pstore_8 [r11_exactAddress], r1
 	
 	
-	imm exactAddress, 736 // the next entry in the data block
+	imm r11_exactAddress, 736 // the next entry in the data block
 	add inodeNumber, inodeNumber, 1
 	// index the memory manager
 		// it has yet to exist, but is hardcoded so we can add it now
-	pstore_16 [exactAddress], inodeNumber
-	add exactAddress, exactAddress, 2
+	pstore_16 [r11_exactAddress], inodeNumber
+	add r11_exactAddress, r11_exactAddress, 2
 	
 	imm r1, 77 // M
-	pstore_8 [exactAddress], r1
-	add exactAddress, exactAddress, 1
+	pstore_8 [r11_exactAddress], r1
+	add r11_exactAddress, r11_exactAddress, 1
 	imm r1, 101 // e
-	pstore_8 [exactAddress], r1
-	add exactAddress, exactAddress, 1
+	pstore_8 [r11_exactAddress], r1
+	add r11_exactAddress, r11_exactAddress, 1
 	imm r1, 109 // m
-	pstore_8 [exactAddress], r1
-	add exactAddress, exactAddress, 1
+	pstore_8 [r11_exactAddress], r1
+	add r11_exactAddress, r11_exactAddress, 1
 	imm r1, 77 // M
-	pstore_8 [exactAddress], r1
-	add exactAddress, exactAddress, 1
+	pstore_8 [r11_exactAddress], r1
+	add r11_exactAddress, r11_exactAddress, 1
 	imm r1, 97 // a
-	pstore_8 [exactAddress], r1
-	add exactAddress, exactAddress, 1
+	pstore_8 [r11_exactAddress], r1
+	add r11_exactAddress, r11_exactAddress, 1
 	imm r1, 110 // n
-	pstore_8 [exactAddress], r1
-	add exactAddress, exactAddress, 1
+	pstore_8 [r11_exactAddress], r1
+	add r11_exactAddress, r11_exactAddress, 1
 	imm r1, 46 // .
-	pstore_8 [exactAddress], r1
-	add exactAddress, exactAddress, 1
-	imm r1, 75 // K
-	pstore_8 [exactAddress], r1
-	add exactAddress, exactAddress, 1
-	imm r1, 69 // E
-	pstore_8 [exactAddress], r1
-	add exactAddress, exactAddress, 1
-	imm r1, 82 // R
-	pstore_8 [exactAddress], r1
-	add exactAddress, exactAddress, 1
+	pstore_8 [r11_exactAddress], r1
+	add r11_exactAddress, r11_exactAddress, 1
+	imm r1, 107 // k
+	pstore_8 [r11_exactAddress], r1
+	add r11_exactAddress, r11_exactAddress, 1
+	imm r1, 101 // e
+	pstore_8 [r11_exactAddress], r1
+	add r11_exactAddress, r11_exactAddress, 1
+	imm r1, 114 // r
+	pstore_8 [r11_exactAddress], r1
+	add r11_exactAddress, r11_exactAddress, 1
 	
 	return
 	
@@ -457,80 +460,179 @@ CreateMemoryManager:
 	
 	// each INODE contains:
 	// 0: file type (1B)
-	imm exactAddress, 208 // (3*64+16)
-	imm fileType, fileType_KER
-	pstore_8 [exactAddress], fileType
+	imm r11_exactAddress, 208 // (3*64+16)
+	imm fileType, fileType_ker
+	pstore_8 [r11_exactAddress], fileType
 	// 1-2: size in bytes (2B)
-	add exactAddress, exactAddress, 1
+	add r11_exactAddress, r11_exactAddress, 1
 	imm fileSize, 13
-	pstore_16 [exactAddress], fileSize
+	pstore_16 [r11_exactAddress], fileSize
 	// 3-4: timestamp (2B)
-	add exactAddress, exactAddress, 2
+	add r11_exactAddress, r11_exactAddress, 2
 	time_0 timestamp
-	pstore_16 [exactAddress], timestamp
+	pstore_16 [r11_exactAddress], timestamp
 	// 5-6: link count (2B)
 		// this directly counts how many data entries link to it
 		// upon creation, this will be 1. the link from its parent
-	add exactAddress, exactAddress, 2
+	add r11_exactAddress, r11_exactAddress, 2
 	imm linkCount, 1
-	pstore_16 [exactAddress], linkCount
+	pstore_16 [r11_exactAddress], linkCount
 	// 7-14: block pointers (8B)
 		// each pointer is 2B. it stores the exact address
 		// pointer #4 (from 1) is an indirect pointer
 		// this allows an inode to reference up to 35 blocks
-	add exactAddress, exactAddress, 2
+	add r11_exactAddress, r11_exactAddress, 2
 	push blockNumber
 	imm blockNumber, 768	// the 2nd data block of the first group (12*64)
-	pstore_16 [exactAddress], blockNumber
-	add exactAddress, exactAddress, 2
+	pstore_16 [r11_exactAddress], blockNumber
+	add r11_exactAddress, r11_exactAddress, 2
 	add blockNumber, blockNumber, BLOCK_SIZE
-	pstore_16 [exactAddress], blockNumber
+	pstore_16 [r11_exactAddress], blockNumber
 	pop blockNumber
 
 	// it has already been hardcoded as a child of root
 	
 	//STEP 2: navigate to the data block and start creating program data!
-	imm exactAddress, 768	// the 2nd data block of the first group (12*64)
+	imm r11_exactAddress, 768	// the 2nd data block of the first group (12*64)
 	
 	// low key, i don't actually know what to put here yet.
 	imm r1, 69
-	pstore_8 [exactAddress], r1
-	add exactAddress, exactAddress, 1
+	pstore_8 [r11_exactAddress], r1
+	add r11_exactAddress, r11_exactAddress, 1
 	imm r1, 00
-	pstore_8 [exactAddress], r1
-	add exactAddress, exactAddress, 1
+	pstore_8 [r11_exactAddress], r1
+	add r11_exactAddress, r11_exactAddress, 1
 	imm r1, 67
-	pstore_8 [exactAddress], r1
-	add exactAddress, exactAddress, 1
+	pstore_8 [r11_exactAddress], r1
+	add r11_exactAddress, r11_exactAddress, 1
 	imm r1, 00
-	pstore_8 [exactAddress], r1
-	add exactAddress, exactAddress, 1
+	pstore_8 [r11_exactAddress], r1
+	add r11_exactAddress, r11_exactAddress, 1
 	imm r1, 420
-	pstore_8 [exactAddress], r1
-	add exactAddress, exactAddress, 1
+	pstore_8 [r11_exactAddress], r1
+	add r11_exactAddress, r11_exactAddress, 1
 	imm r1, 69
-	pstore_8 [exactAddress], r1
-	add exactAddress, exactAddress, 1
+	pstore_8 [r11_exactAddress], r1
+	add r11_exactAddress, r11_exactAddress, 1
 	imm r1, 0
-	pstore_8 [exactAddress], r1
-	add exactAddress, exactAddress, 1
+	pstore_8 [r11_exactAddress], r1
+	add r11_exactAddress, r11_exactAddress, 1
 	imm r1, 78
-	pstore_8 [exactAddress], r1
-	add exactAddress, exactAddress, 1
+	pstore_8 [r11_exactAddress], r1
+	add r11_exactAddress, r11_exactAddress, 1
 	imm r1, 32
-	pstore_8 [exactAddress], r1
-	add exactAddress, exactAddress, 1
+	pstore_8 [r11_exactAddress], r1
+	add r11_exactAddress, r11_exactAddress, 1
 	imm r1, 87
-	pstore_8 [exactAddress], r1
-	add exactAddress, exactAddress, 1
+	pstore_8 [r11_exactAddress], r1
+	add r11_exactAddress, r11_exactAddress, 1
 	imm r1, 79
-	pstore_8 [exactAddress], r1
-	add exactAddress, exactAddress, 1
+	pstore_8 [r11_exactAddress], r1
+	add r11_exactAddress, r11_exactAddress, 1
 	imm r1, 82
-	pstore_8 [exactAddress], r1
-	add exactAddress, exactAddress, 1
+	pstore_8 [r11_exactAddress], r1
+	add r11_exactAddress, r11_exactAddress, 1
 	imm r1, 68
-	pstore_8 [exactAddress], r1
-	add exactAddress, exactAddress, 1
+	pstore_8 [r11_exactAddress], r1
+	add r11_exactAddress, r11_exactAddress, 1
 	
 	return
+
+
+CreateExecutor:
+	// create the inode
+		imm r11_exactAddress, 240	// (64*3 + 16*3)
+
+		const r1_value = r1
+		imm r1_value, fileType_ker
+		pstore_8 [r11_exactAddress], r1_value
+		add r11_exactAddress, r11_exactAddress, 1
+		imm r1_value, 0
+		pstore_16 [r11_exactAddress], r1_value
+		add r11_exactAddress, r11_exactAddress, 2
+		time_0 r1_value
+		pstore_16 [r11_exactAddress], r1_value
+		add r11_exactAddress, r11_exactAddress, 2
+		imm r1_value, 1	// link from parent
+		pstore_16 [r11_exactAddress], r1_value
+		add r11_exactAddress, r11_exactAddress, 2
+		imm r1_value, 832	// next available data block (64*13) 
+		pstore_16 [r11_exactAddress], r1_value
+
+	// mark it as taken in the inode map
+		imm r11_exactAddress, 136	// (2*64 + 8)
+		pload_16 r1_value, [r11_exactAddress]
+		lsr r1_value, r1_value, 1
+		pstore_16 [r11_exactAddress], r1_value
+
+	// add it to the root
+		imm r11_exactAddress, 192	// very first inode (root's)
+		add r11_exactAddress, r11_exactAddress, 1
+		// increment the size in bytes
+		pload_16 r1_value, [r11_exactAddress]
+		add r1_value, r1_value, 16
+		pstore_16 [r11_exactAddress], r1_value
+
+		// increment the link count
+		add r11_exactAddress, r11_exactAddress, 4
+		pload_16 r1_value, [r11_exactAddress]
+		add r1_value, r1_value, 1
+		pstore_16 [r11_exactAddress], r1_value
+
+		// get to the block pointers
+		add r11_exactAddress, r11_exactAddress, 2
+		pload_16 r11_exactAddress, [r11_exactAddress]
+		add r11_exactAddress, r11_exactAddress, 48
+
+		imm r1_value, 3
+		pstore_16 [r11_exactAddress], r1_value
+
+		add r11_exactAddress, r11_exactAddress, 2
+		
+		imm r1, 69 // E
+		pstore_8 [r11_exactAddress], r1
+		add r11_exactAddress, r11_exactAddress, 1
+		imm r1, 120 // x
+		pstore_8 [r11_exactAddress], r1
+		add r11_exactAddress, r11_exactAddress, 1
+		imm r1, 101 // e
+		pstore_8 [r11_exactAddress], r1
+		add r11_exactAddress, r11_exactAddress, 1
+		imm r1, 99 // c
+		pstore_8 [r11_exactAddress], r1
+		add r11_exactAddress, r11_exactAddress, 1
+		imm r1, 117 // u
+		pstore_8 [r11_exactAddress], r1
+		add r11_exactAddress, r11_exactAddress, 1
+		imm r1, 116 // t
+		pstore_8 [r11_exactAddress], r1
+		add r11_exactAddress, r11_exactAddress, 1
+		imm r1, 111 // o
+		pstore_8 [r11_exactAddress], r1
+		add r11_exactAddress, r11_exactAddress, 1
+		imm r1, 114 // r
+		pstore_8 [r11_exactAddress], r1
+		add r11_exactAddress, r11_exactAddress, 1
+		imm r1, 46 // .
+		pstore_8 [r11_exactAddress], r1
+		add r11_exactAddress, r11_exactAddress, 1
+		imm r1, 107 // k
+		pstore_8 [r11_exactAddress], r1
+		add r11_exactAddress, r11_exactAddress, 1
+		imm r1, 101 // e
+		pstore_8 [r11_exactAddress], r1
+		add r11_exactAddress, r11_exactAddress, 1
+		imm r1, 114 // r
+		pstore_8 [r11_exactAddress], r1
+		add r11_exactAddress, r11_exactAddress, 1
+
+
+	// jump to the first data block
+	imm r11_exactAddress, 832
+
+
+	return
+	
+	
+OnClockInterrupt:
+	IRET

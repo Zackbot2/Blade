@@ -35,7 +35,7 @@ nop
 00000000 00000000 00000000 00000000
 Does nothing
 
-imm %a(register), %b(immediate | colour)
+imm %a(register), %b(immediate | colour | label)
 00110001 aaaa0000 bbbbbbbb bbbbbbbb
 
 in %a(register)
@@ -195,9 +195,9 @@ DIV %b and %c and store the remainder in %a.
 
 
 
-jmp %a(register)
-01001000 0000aaaa 00000000 00000000
-Jump to %a
+jmp %b(register)
+01001000 0000bbbb 00000000 00000000
+Jump to %b
 
 jmp %a(immediate | label)
 01011000 00001111 aaaaaaaa aaaaaaaa
@@ -361,11 +361,6 @@ return
 Returns from the last function call. Overwrites the flag register. This instruction is a synonym for:   load_16 flags, [sp]   add sp, sp, 2   jmp flags
 
 
-backspace
-00110101 00110011 00000000 00000001   01100101 00000000 00000011 00000000
-triggers a backspace - [sub r3, r3, 1], [pstore_8, [r3], 0]
-
-
 dstore %value(register), [%address(immediate | colour)]
 01111000 0000vvvv aaaaaaaa aaaaaaaa
 
@@ -380,6 +375,14 @@ draw %value(register), [%address(register)]
 
 
 
-IRET
+iret
 10000000 00000000 00000000 00000000
 return execution responsibility to the interrupt handler
+
+ienable
+10000001 00000000 00000000 00000000
+enable interrupts
+
+idisable
+10000010 00000000 00000000 00000000
+disable interrupts

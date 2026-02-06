@@ -16,6 +16,8 @@ const accessAddress = r13
 
 const maxPixelPosition = 19200
 
+
+
 // set stack offset
 imm sp, STACK_OFFSET
 
@@ -219,74 +221,6 @@ PrintAllCharacters:
 		add pixelPosition, pixelPosition, 9
 		jmp PrintAllCharacters_PrintNext
 	
-// FUNCTION: init
-
-InitMemoryManager:
-	
-	// this function will be run on computer startup
-	// it accounts for the fact it will be loaded into memory before it is run
-
-	// MEMORY FORMAT:
-	// 0-36863: user program (36kb)
-	// 36864-45055: kernel program (8kb)
-	// 45056-49151: kernel heap (4kb)
-	// 49152-55295: user heap (6kb)
-	// 55296-65535: stack (10kb)
-
-	// there is no bitmap to initialize
-	// initialize the block header of the kernel heap
-		// header format: free/used (1 bit) size (15 bits)
-		// 0 means free and 1 means taken
-	imm r1, 0b0001000000000000 // 4KiB
-	store_16 [45056], r1
-	// do the same for the user heap
-	imm r1, 0b0001100000000000 // 6KiB
-	store_16 [49152], r1
-	// and the user program
-	imm r1, 0b1000000000000000 // 32KiB
-	store_16 [4096], r1
-	
-	// load memory manager functions into kernel program ram
-	
-	
-	
-	// FUNCTION: find heap block
-	
-		// navigate to the start of the heap
-		imm r2, 36864
-		// read the header of block 1 (2 bytes)
-		load_16 r3, [r2]
-		
-		// if it's free (not negative)
-		cmp r3, 0
-		// mask the first bit to get the size regardless
-		and r3, r3, 0b0111111111111111
-		jge 36
-			// if it's taken, add that number to the address
-			add r2, r2, r3
-			jmp 4
-		
-		// only accept it if it can fit the size requested
-			// size is stored in r1
-		cmp r3, r1
-		// TODO: i think this should search the next block? so add before jumping
-		jl 4	// THIS IS INDEX 36 DURING RUNTIME
-		
-		// claim the header
-		add r1, r1, 0b1000000000000000
-		store_16 [r2], r1
-		// prep the header for the next block
-		sub r1, r1, 0b1000000000000000
-		add r2, r2, r1
-		cmp r1, r3
-		je 68
-		// create the next block's header
-		sub r3, r3, r1
-		store_16 [r2], r3
-
-		return // THIS IS INDEX 72 DURING RUNTIME
-		
-
 // initialize the kernel program
 InitKernelProgram:
 	// the purpose of this code is to load core FS and MM functionality
@@ -298,17 +232,20 @@ InitKernelProgram:
 		// - run programs in UPG and KPG memory using UH and KH respectively
 	
 	// ============================================================================
-	
+
 	// INITIALIZE HEADERS
 	// header format: free/used (1 bit) size (15 bits)
 	// 0 means free and 1 means taken
 	imm r1, 0b0001000000000000 // 4KiB
+	sub r1, r1, 2
 	store_16 [45056], r1
 	// do the same for the user heap
 	imm r1, 0b0001100000000000 // 6KiB
+	sub r1, r1, 2
 	store_16 [49152], r1
 	// and the user program
-	imm r1, 0b0111111111111111 // 32KiB (32767B) (yes, we're 1 short...)
+	imm r1, 0b0111111111111111 // 32KiB (32767B)
+	sub r1, r1, 1
 	store_16 [4096], r1
 	
 
