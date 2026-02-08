@@ -377,12 +377,68 @@ draw %value(register), [%address(register)]
 
 iret
 10000000 00000000 00000000 00000000
-return execution responsibility to the interrupt handler
+return from an interrupt. Enters user mode and enables interrupts. Requires kernel permissions.
+
+user_mode %a(register)
+10000001 0000aaaa 00000000 00000000  10000000 00000000 00000000 00000000
+Push a fake interrupt to the interrupt stack and iret to %a.
+
+user_mode %a(immediate | label)
+10010001 00000000 aaaaaaaa aaaaaaaa  10000000 00000000 00000000 00000000
+Push a fake interrupt to the interrupt stack and iret to %a.
 
 ienable
-10000001 00000000 00000000 00000000
-enable interrupts
+10000010 00000000 00000000 00000000
+enable interrupts. Requires kernel permissions.
 
 idisable
-10000010 00000000 00000000 00000000
-disable interrupts
+10000011 00000000 00000000 00000000
+disable interrupts. Requires kernel permissions.
+
+
+i_sp %a(register)
+10000100 0000aaaa 00000000 00000000
+Set the value of sp in the interrupt stack to %a. Requires kernel permissions.
+
+i_sp %a(immediate | label)
+10010100 00000000 aaaaaaaa aaaaaaaa
+Set the value of sp in the interrupt stack to %a. Requires kernel permissions.
+
+i_flags %a(register)
+10000101 0000aaaa 00000000 00000000
+Set the value of flags in the interrupt stack to %a. Requires kernel permissions.
+
+i_flags %a(immediate | label)
+10010101 00000000 aaaaaaaa aaaaaaaa
+Set the value of flags in the interrupt stack to %a. Requires kernel permissions.
+
+set_i_pc %a(register)
+10000110 0000aaaa 00000000 00000000
+Set the value of pc in the interrupt stack to %a. Requires kernel permissions.
+
+set_i_pc %a(immediate | label)
+10010110 00000000 aaaaaaaa aaaaaaaa
+Set the value of pc in the interrupt stack to %a. Requires kernel permissions.
+
+get_i_pc %a(register)
+10000111 aaaa0000 00000000 00000000
+Set the value of pc in the interrupt stack and store it in %a. Requires kernel permissions.
+
+
+set_base %a(register)
+10001000 0000aaaa 00000000 00000000
+
+set_base %a(immediate | label)
+10011000 00000000 aaaaaaaa aaaaaaaa
+
+set_lim %a(register)
+10001001 0000aaaa 00000000 00000000
+
+set_lim %a(immediate | label)
+10011001 00000000 aaaaaaaa aaaaaaaa
+
+get_base %a(register)
+10001010 aaaa0000 00000000 00000000
+
+get_lim %a(register)
+10001011 aaaa0000 00000000 00000000
