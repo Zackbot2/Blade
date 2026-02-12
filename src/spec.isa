@@ -19,7 +19,25 @@ r11 1011
 r12 1100
 r13 1101
 sp 1110
-flags 1111
+lr 1111
+
+cregister
+// ALL CONTROL REGISTERS 0xFF (255) AND UNDER ARE ABSTRACT. 0x100 (256) AND ABOVE ARE DIRECT STORED
+// status bits: IE / - / - / - / - / - / - / - / - / - / - / - / - / - / - / -
+status 0000000000000000
+base 0000000000000001
+limit 0000000000000010
+exsp 0000000000000011 // read-only
+CI 0000000000000100	// read-only
+CI_interval 0000000000000101
+// ====== DIRECT STORED [0x100+] ======
+// --- READ ONLY [0x100+] ---
+// fault cause
+cause 0000000100000001
+// --- READ/WRITE [0x180+] ---
+// kernel stack pointer
+ksp 0000000110000000
+
 
 colour
 red 11100000
@@ -375,70 +393,74 @@ draw %value(register), [%address(register)]
 
 
 
-iret
+exret
 10000000 00000000 00000000 00000000
-return from an interrupt. Enters user mode and enables interrupts. Requires kernel permissions.
+Return from an exception. Enables interrupts. Requires kernel mode.
 
-user_mode %a(register)
-10000001 0000aaaa 00000000 00000000  10000000 00000000 00000000 00000000
-Push a fake interrupt to the interrupt stack and iret to %a.
+trap
+10000001 00000000 00000000 00000000
+Trigger a trap. Requires user mode.
 
-user_mode %a(immediate | label)
-10010001 00000000 aaaaaaaa aaaaaaaa  10000000 00000000 00000000 00000000
-Push a fake interrupt to the interrupt stack and iret to %a.
+
+cload %a(register), %c(cregister)
+10010010 aaaa0000 cccccccc cccccccc
+Load %c into %a. Requires kernel mode.
+
+cstore %c(cregister), %a(register)
+10010011 0000aaaa cccccccc cccccccc
+Load %c into %a. Requires kernel mode.
+
+
+launch_user %a(register)
+10000110 0000aaaa 00000000 00000000
+Fabricate an exception frame, with %a as the PC, and prepare to exret. Requires kernel mode.
+
+launch_user %a(immediate | label)
+10010110 00000000 aaaaaaaa aaaaaaaa
+Fabricate an exception frame, with %a as the PC, and prepare to exret. Requires kernel mode.
+
 
 ienable
-10000010 00000000 00000000 00000000
-enable interrupts. Requires kernel permissions.
+10000100 00000000 00000000 00000000
+Enable interrupts. Requires kernel mode.
 
 idisable
-10000011 00000000 00000000 00000000
-disable interrupts. Requires kernel permissions.
+10000101 00000000 00000000 00000000
+Disable interrupts. Requires kernel mode.
 
 
-i_sp %a(register)
-10000100 0000aaaa 00000000 00000000
-Set the value of sp in the interrupt stack to %a. Requires kernel permissions.
-
-i_sp %a(immediate | label)
-10010100 00000000 aaaaaaaa aaaaaaaa
-Set the value of sp in the interrupt stack to %a. Requires kernel permissions.
-
-i_flags %a(register)
-10000101 0000aaaa 00000000 00000000
-Set the value of flags in the interrupt stack to %a. Requires kernel permissions.
-
-i_flags %a(immediate | label)
-10010101 00000000 aaaaaaaa aaaaaaaa
-Set the value of flags in the interrupt stack to %a. Requires kernel permissions.
-
-set_i_pc %a(register)
-10000110 0000aaaa 00000000 00000000
-Set the value of pc in the interrupt stack to %a. Requires kernel permissions.
-
-set_i_pc %a(immediate | label)
-10010110 00000000 aaaaaaaa aaaaaaaa
-Set the value of pc in the interrupt stack to %a. Requires kernel permissions.
-
-get_i_pc %a(register)
-10000111 aaaa0000 00000000 00000000
-Set the value of pc in the interrupt stack and store it in %a. Requires kernel permissions.
-
-
-set_base %a(register)
-10001000 0000aaaa 00000000 00000000
-
-set_base %a(immediate | label)
-10011000 00000000 aaaaaaaa aaaaaaaa
-
-set_lim %a(register)
-10001001 0000aaaa 00000000 00000000
-
-set_lim %a(immediate | label)
-10011001 00000000 aaaaaaaa aaaaaaaa
-
-get_base %a(register)
+exget_sp %a(register)
 10001010 aaaa0000 00000000 00000000
+Get the value of sp in the exception stack and store it in %a. Requires kernel mode.
 
-get_lim %a(register)
-10001011 aaaa0000 00000000 00000000
+exset_sp %a(register)
+10001011 0000aaaa 00000000 00000000
+Set the value of sp in the exception stack to %a. Requires kernel mode.
+
+exset_sp %a(immediate | label)
+10011011 00000000 aaaaaaaa aaaaaaaa
+Set the value of sp in the exception stack to %a. Requires kernel mode.
+
+exget_status %a(register)
+10001100 aaaa0000 00000000 00000000
+Get the value of status in the exception stack and store it in %a. Requires kernel mode.
+
+exset_status %a(register)
+10001101 0000aaaa 00000000 00000000
+Set the value of status in the exception stack to %a. Requires kernel mode.
+
+exset_status %a(immediate | label)
+10011101 00000000 aaaaaaaa aaaaaaaa
+Set the value of status in the exception stack to %a. Requires kernel mode.
+
+exget_pc %a(register)
+10001110 aaaa0000 00000000 00000000
+Get the value of pc in the exception stack and store it in %a. Requires kernel mode.
+
+exset_pc %a(register)
+10001111 0000aaaa 00000000 00000000
+Set the value of pc in the exception stack to %a. Requires kernel mode.
+
+exset_pc %a(immediate | label)
+10011111 00000000 aaaaaaaa aaaaaaaa
+Set the value of pc in the exception stack to %a. Requires kernel mode.
